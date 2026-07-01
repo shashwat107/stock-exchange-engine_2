@@ -1,42 +1,36 @@
-import { serve } from '@hono/node-server'
-import { Hono } from 'hono'
-import { simulateGBMStep } from './utils/gbm.js'
+// ─── index.ts ─────────────────────────────────────────────────────────────────
+// Entry point — wires routes and starts the tick engine + HTTP server.
 
-const app = new Hono()
+import 'dotenv/config';
+import { serve } from '@hono/node-server';
+import { Hono } from 'hono';
+import orders from './routes/orders.js';
+import portfolioSummary from './routes/portfolioSummary.js';
 
-// We store the current stock price in the server's memory.
-let currentPriceCents = 15000; 
+import leaderboard from './routes/leaderboard.js';
+import { startTickEngine } from './lib/stockEngine.js';
+import market    from './routes/market.js';
+import portfolio from './routes/portfolio.js';
 
-app.get('/', (c) => {
-  return c.text('Stock Exchange Engine is running!')
-})
+const app = new Hono();
 
-// This is our new API endpoint to get a stock price tick
-app.get('/api/tick', (c) => {
-  // Calculate the new price using our math engine
-  const newPriceCents = simulateGBMStep(
-    currentPriceCents / 100, 
-    0.05,                    
-    0.20,                    
-    1 / 252                  
-  );
+// ─── Health check ─────────────────────────────────────────────────────────────
+app.get('/', (c) => c.text('Stock Exchange Engine is running!'));
 
-  // Update the global price
-  currentPriceCents = newPriceCents;
+app.route('/api', market);
+app.route('/api', portfolio);
+app.route('/api', leaderboard); // <-- ADD THIS LINE
+// ─── Mount route modules ──────────────────────────────────────────────────────
+app.route('/api', market);    // GET  /api/tick
+app.route('/api', portfolio);
+app.route('/api/orders', orders);
+app.route('/api/portfolioSummary', portfolioSummary); // GET  /api/portfolio  |  POST /api/trade
 
-  // Send the result back
-  return c.json({
-    priceInCents: currentPriceCents,
-    formattedPrice: `$${(currentPriceCents / 100).toFixed(2)}`
-  });
-})
+// ─── Start price-tick engine ──────────────────────────────────────────────────
+startTickEngine(2000);
 
-// --- THE MISSING PIECE ---
-// This tells Node.js to actually start listening on a port
-const port = 3000
-console.log(`Server is running on http://localhost:${port}`)
+// ─── Start HTTP server ────────────────────────────────────────────────────────
+const port = Number(process.env.PORT) || 3000;
+console.log(`Server is running on http://localhost:${port}`);
 
-serve({
-  fetch: app.fetch,
-  port
-})
+serve({ fetch: app.fetch, port });

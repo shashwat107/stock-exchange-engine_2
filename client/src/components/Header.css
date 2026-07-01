@@ -1,0 +1,44 @@
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 4px 0 16px;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.1);
+}
+
+.header__identity {
+  min-width: 140px;
+}
+
+.header__symbol {
+  font-size: 22px;
+  font-weight: 700;
+  transition: color 0.2s ease;
+  font-family: "Sora", sans-serif;
+}
+
+.header__subtitle {
+  font-size: 11px;
+  color: #475569;
+  font-family: "IBM Plex Mono", monospace;
+  margin-top: 2px;
+}
+
+.header__price-wrap {
+  text-align: right;
+  min-width: 140px;
+}
+
+.header__live-price {
+  font-size: 20px;
+  font-weight: 700;
+  font-family: "IBM Plex Mono", monospace;
+  transition: color 0.2s ease;
+}
+
+.header__price-change {
+  font-size: 11px;
+  font-family: "IBM Plex Mono", monospace;
+  margin-top: 2px;
+  transition: color 0.2s ease;
+}

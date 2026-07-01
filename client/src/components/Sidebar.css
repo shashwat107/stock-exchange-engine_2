@@ -1,0 +1,131 @@
+/* Base Sidebar Settings */
+.sidebar {
+  background: #0a1120;
+  border-right: 1px solid rgba(148, 163, 184, 0.1);
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1), padding 0.3s ease;
+  flex-shrink: 0;
+  overflow: hidden;
+}
+
+/* Open State */
+.sidebar--open {
+  width: 240px;
+  padding: 24px 16px;
+}
+
+/* Closed State */
+.sidebar--closed {
+  width: 72px;
+  padding: 24px 12px;
+  align-items: center; /* Centers the icons when closed */
+}
+
+/* Header Area (Hamburger + Logo) */
+.sidebar__header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 40px;
+  height: 32px;
+}
+
+.hamburger-btn {
+  background: transparent;
+  border: none;
+  color: #94a3b8;
+  font-size: 22px;
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 6px;
+  transition: background 0.2s ease, color 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.hamburger-btn:hover {
+  background: rgba(148, 163, 184, 0.1);
+  color: #f1f5f9;
+}
+
+.sidebar__brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-family: "IBM Plex Mono", monospace;
+  font-weight: 700;
+  color: #f1f5f9;
+  font-size: 15px;
+  white-space: nowrap; /* Prevents text from wrapping during animation */
+}
+
+.brand-dot {
+  width: 10px;
+  height: 10px;
+  background: #60a5fa;
+  border-radius: 50%;
+  box-shadow: 0 0 10px rgba(96, 165, 250, 0.5);
+  flex-shrink: 0;
+}
+
+/* Navigation System */
+.sidebar__nav {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+}
+
+.nav-btn {
+  display: flex;
+  align-items: center;
+  background: transparent;
+  border: none;
+  color: #94a3b8;
+  font-family: "Sora", sans-serif;
+  font-size: 14px;
+  font-weight: 500;
+  padding: 12px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  width: 100%;
+  white-space: nowrap; /* Prevents text wrap */
+}
+
+/* Add a gap only when open so icons center perfectly when closed */
+.sidebar--open .nav-btn {
+  gap: 12px;
+}
+
+.nav-icon {
+  font-size: 18px;
+  flex-shrink: 0;
+}
+
+.nav-label {
+  animation: fadeIn 0.3s ease;
+}
+
+.nav-btn:hover {
+  background: rgba(148, 163, 184, 0.05);
+  color: #f1f5f9;
+}
+
+.nav-btn--active {
+  background: rgba(96, 165, 250, 0.1);
+  color: #60a5fa;
+  font-weight: 600;
+}
+
+.nav-btn--active:hover {
+  background: rgba(96, 165, 250, 0.15);
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
