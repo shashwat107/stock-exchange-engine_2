@@ -4,7 +4,7 @@ import { processOrderBook } from '../lib/matchingEngine.js'; // 1. IMPORT THE EN
 
 const orders = new Hono();
 
-// Route 1: Get ONLY the pending orders for the logged-in user
+// Route 1: Get the order history for the logged-in user
 orders.get('/pending', async (c) => {
   try {
     const email = c.req.query('email');
@@ -16,7 +16,8 @@ orders.get('/pending', async (c) => {
     const { data, error } = await supabase
       .from('orders')
       .select('*')
-      .eq('status', 'PENDING')
+      // 🔥 THE FIX: Fetch all order statuses so they don't disappear!
+      .in('status', ['PENDING', 'FILLED', 'CANCELLED'])
       .eq('user_email', email)
       .order('created_at', { ascending: false });
 
