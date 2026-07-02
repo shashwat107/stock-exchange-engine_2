@@ -2,8 +2,8 @@ import React, { useState, useEffect, useCallback } from 'react';
 
 // Accept the real logged-in user as a prop
 export default function OrderBook({ user }) {
-  const [ordersHistory, setOrdersHistory] = useState([]); // Renamed state to reflect full history
-  const [holdings, setHoldings] = useState([]); // Track user's owned stocks
+  const [ordersHistory, setOrdersHistory] = useState([]); 
+  const [holdings, setHoldings] = useState([]); 
   const [stockSymbol, setStockSymbol] = useState('MOCK');
   const [orderType, setOrderType] = useState('BUY');
   const [quantity, setQuantity] = useState(1);
@@ -24,7 +24,7 @@ export default function OrderBook({ user }) {
     }
   }, [user?.email]);
 
-  // 2. Fetch user's current holdings to validate short selling
+  // 2. Fetch user's current holdings
   const fetchHoldings = useCallback(async () => {
     if (!user?.email) return;
     try {
@@ -34,7 +34,7 @@ export default function OrderBook({ user }) {
         setHoldings(data.holdings);
       }
     } catch (err) {
-      console.error("Error fetching holdings for validation:", err);
+      console.error("Error fetching holdings:", err);
     }
   }, [user?.email]);
 
@@ -53,7 +53,7 @@ export default function OrderBook({ user }) {
     e.preventDefault();
     const targetQuantity = parseInt(quantity);
 
-    // 3. Validation Guard: Check if user owns enough shares to SELL
+    // Validation Guard for Selling
     if (orderType === 'SELL') {
       const existingHolding = holdings.find(h => h.stock_symbol === stockSymbol);
       const sharesOwned = existingHolding ? existingHolding.quantity : 0;
@@ -68,7 +68,7 @@ export default function OrderBook({ user }) {
     const newOrder = {
       user_email: user.email,
       stock_symbol: stockSymbol,
-      orderType: orderType,
+      order_type: orderType,
       quantity: targetQuantity,
       price_cents: Math.round(parseFloat(price) * 100) 
     };
@@ -98,25 +98,25 @@ export default function OrderBook({ user }) {
     }
   }
 
-  // Quick helper to show user how many shares they own right in the form
   const currentStockHolding = holdings.find(h => h.stock_symbol === stockSymbol);
   const sharesAvailable = currentStockHolding ? currentStockHolding.quantity : 0;
 
-  // Helper function to render nice colorful badges for the status
+  // UI Badges
   const getStatusBadge = (status) => {
-    if (status === 'FILLED') {
-      return <span style={{ background: 'rgba(52, 211, 153, 0.2)', color: '#34d399', padding: '4px 8px', borderRadius: '4px', fontSize: '11px', fontWeight: 'bold' }}>✅ FILLED</span>;
-    }
-    if (status === 'CANCELLED') {
-      return <span style={{ background: 'rgba(248, 113, 113, 0.2)', color: '#f87171', padding: '4px 8px', borderRadius: '4px', fontSize: '11px', fontWeight: 'bold' }}>❌ CANCELLED</span>;
-    }
+    if (status === 'FILLED') return <span style={{ background: 'rgba(52, 211, 153, 0.2)', color: '#34d399', padding: '4px 8px', borderRadius: '4px', fontSize: '11px', fontWeight: 'bold' }}>✅ FILLED</span>;
+    if (status === 'CANCELLED') return <span style={{ background: 'rgba(248, 113, 113, 0.2)', color: '#f87171', padding: '4px 8px', borderRadius: '4px', fontSize: '11px', fontWeight: 'bold' }}>❌ CANCELLED</span>;
     return <span style={{ background: 'rgba(59, 130, 246, 0.2)', color: '#3b82f6', padding: '4px 8px', borderRadius: '4px', fontSize: '11px', fontWeight: 'bold' }}>⏳ PENDING</span>;
   };
 
+  // 🔥 Split the data into two separate lists!
+  const pendingList = ordersHistory.filter(order => order.status === 'PENDING');
+  const pastList = ordersHistory.filter(order => order.status !== 'PENDING');
+
   return (
     <div style={{ padding: '24px', color: '#f1f5f9', fontFamily: '"Sora", sans-serif' }}>
-      <h2 style={{ marginBottom: '24px' }}>📉 My Order Book</h2>
+      <h2 style={{ marginBottom: '24px' }}>📉 Order Book</h2>
 
+      {/* --- FORM SECTION --- */}
       <form onSubmit={placeOrder} style={{ marginBottom: '40px', background: '#0a1120', padding: '24px', borderRadius: '12px', border: '1px solid rgba(148, 163, 184, 0.1)' }}>
         <h3 style={{ marginTop: 0, marginBottom: '8px' }}>Place a New Limit Order</h3>
         <p style={{ margin: '0 0 20px 0', fontSize: '13px', color: '#64748b' }}>
@@ -163,8 +163,37 @@ export default function OrderBook({ user }) {
         )}
       </form>
 
-      <h3 style={{ marginBottom: '16px' }}>My Order History</h3>
-      <table style={{ width: '100%', textAlign: 'left', borderCollapse: 'collapse', background: '#0a1120', borderRadius: '12px', overflow: 'hidden' }}>
+      {/* --- TABLE 1: ACTIVE PENDING ORDERS --- */}
+      <h3 style={{ marginBottom: '16px', color: '#f8fafc' }}>⏳ Active Pending Orders</h3>
+      <table style={{ width: '100%', textAlign: 'left', borderCollapse: 'collapse', background: '#0a1120', borderRadius: '12px', overflow: 'hidden', marginBottom: '40px' }}>
+        <thead style={{ background: 'rgba(148, 163, 184, 0.05)' }}>
+          <tr>
+            <th style={{ padding: '16px', color: '#94a3b8', fontSize: '12px', textTransform: 'uppercase' }}>Type</th>
+            <th style={{ padding: '16px', color: '#94a3b8', fontSize: '12px', textTransform: 'uppercase' }}>Stock</th>
+            <th style={{ padding: '16px', color: '#94a3b8', fontSize: '12px', textTransform: 'uppercase' }}>Quantity</th>
+            <th style={{ padding: '16px', color: '#94a3b8', fontSize: '12px', textTransform: 'uppercase' }}>Limit Price</th>
+          </tr>
+        </thead>
+        <tbody>
+          {pendingList.map(order => (
+            <tr key={order.id} style={{ borderBottom: '1px solid rgba(148, 163, 184, 0.05)' }}>
+              <td style={{ padding: '16px', fontWeight: 'bold', color: order.order_type === 'BUY' ? '#34d399' : '#f87171' }}>{order.order_type}</td>
+              <td style={{ padding: '16px' }}>{order.stock_symbol}</td>
+              <td style={{ padding: '16px' }}>{order.quantity} shares</td>
+              <td style={{ padding: '16px', fontFamily: '"IBM Plex Mono", monospace' }}>${(order.price_cents / 100).toFixed(2)}</td>
+            </tr>
+          ))}
+          {pendingList.length === 0 && (
+            <tr>
+              <td colSpan="4" style={{ padding: '32px', textAlign: 'center', color: '#64748b', fontStyle: 'italic' }}>No active orders waiting to be filled.</td>
+            </tr>
+          )}
+        </tbody>
+      </table>
+
+      {/* --- TABLE 2: COMPLETED & CANCELLED HISTORY --- */}
+      <h3 style={{ marginBottom: '16px', color: '#94a3b8' }}>📁 Past Order History</h3>
+      <table style={{ width: '100%', textAlign: 'left', borderCollapse: 'collapse', background: 'rgba(10, 17, 32, 0.5)', borderRadius: '12px', overflow: 'hidden', opacity: '0.9' }}>
         <thead style={{ background: 'rgba(148, 163, 184, 0.05)' }}>
           <tr>
             <th style={{ padding: '16px', color: '#94a3b8', fontSize: '12px', textTransform: 'uppercase' }}>Type</th>
@@ -175,7 +204,7 @@ export default function OrderBook({ user }) {
           </tr>
         </thead>
         <tbody>
-          {ordersHistory.map(order => (
+          {pastList.map(order => (
             <tr key={order.id} style={{ borderBottom: '1px solid rgba(148, 163, 184, 0.05)' }}>
               <td style={{ padding: '16px', fontWeight: 'bold', color: order.order_type === 'BUY' ? '#34d399' : '#f87171' }}>{order.order_type}</td>
               <td style={{ padding: '16px' }}>{order.stock_symbol}</td>
@@ -184,9 +213,9 @@ export default function OrderBook({ user }) {
               <td style={{ padding: '16px' }}>{getStatusBadge(order.status)}</td>
             </tr>
           ))}
-          {ordersHistory.length === 0 && (
+          {pastList.length === 0 && (
             <tr>
-              <td colSpan="5" style={{ padding: '32px', textAlign: 'center', color: '#64748b', fontStyle: 'italic' }}>No order history yet.</td>
+              <td colSpan="5" style={{ padding: '32px', textAlign: 'center', color: '#64748b', fontStyle: 'italic' }}>No past history yet.</td>
             </tr>
           )}
         </tbody>
