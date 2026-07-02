@@ -1,6 +1,6 @@
 import React from 'react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine } from 'recharts';
-import { SYMBOL_META } from "../constants";
+import { SYMBOL_META } from "../Constants";
 import "./Stockchart.css";
 
 // We added averageCost as a new prop here
