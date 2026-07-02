@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 
 // Accept the real logged-in user as a prop
 export default function OrderBook({ user }) {
-  const [pendingOrders, setPendingOrders] = useState([]);
+  const [ordersHistory, setOrdersHistory] = useState([]); // Renamed state to reflect full history
   const [holdings, setHoldings] = useState([]); // Track user's owned stocks
   const [stockSymbol, setStockSymbol] = useState('MOCK');
   const [orderType, setOrderType] = useState('BUY');
@@ -10,14 +10,14 @@ export default function OrderBook({ user }) {
   const [price, setPrice] = useState(100);
   const [statusMessage, setStatusMessage] = useState("");
 
-  // 1. Fetch pending orders
+  // 1. Fetch all orders (Pending, Filled, Cancelled)
   const fetchOrders = useCallback(async () => {
     if (!user?.email) return;
     try {
       const res = await fetch(`${import.meta.env.VITE_API_URL}/api/orders/pending?email=${encodeURIComponent(user.email)}`);
       const data = await res.json();
       if (Array.isArray(data)) {
-        setPendingOrders(data);
+        setOrdersHistory(data);
       }
     } catch (err) {
       console.error("Error fetching orders:", err);
@@ -61,14 +61,14 @@ export default function OrderBook({ user }) {
       if (sharesOwned < targetQuantity) {
         setStatusMessage(`❌ Insufficient shares. You only own ${sharesOwned} shares of ${stockSymbol}.`);
         setTimeout(() => setStatusMessage(""), 4000);
-        return; // Halt form submission completely
+        return; 
       }
     }
 
     const newOrder = {
       user_email: user.email,
       stock_symbol: stockSymbol,
-      order_type: orderType,
+      orderType: orderType,
       quantity: targetQuantity,
       price_cents: Math.round(parseFloat(price) * 100) 
     };
@@ -83,7 +83,7 @@ export default function OrderBook({ user }) {
       if (res.ok) {
         setStatusMessage("✅ Order placed successfully!");
         fetchOrders(); 
-        fetchHoldings(); // Refresh holdings after a change
+        fetchHoldings(); 
       } else {
         const errorData = await res.json().catch(() => ({}));
         setStatusMessage(`❌ ${errorData.error || "Failed to place order."}`);
@@ -102,9 +102,20 @@ export default function OrderBook({ user }) {
   const currentStockHolding = holdings.find(h => h.stock_symbol === stockSymbol);
   const sharesAvailable = currentStockHolding ? currentStockHolding.quantity : 0;
 
+  // Helper function to render nice colorful badges for the status
+  const getStatusBadge = (status) => {
+    if (status === 'FILLED') {
+      return <span style={{ background: 'rgba(52, 211, 153, 0.2)', color: '#34d399', padding: '4px 8px', borderRadius: '4px', fontSize: '11px', fontWeight: 'bold' }}>✅ FILLED</span>;
+    }
+    if (status === 'CANCELLED') {
+      return <span style={{ background: 'rgba(248, 113, 113, 0.2)', color: '#f87171', padding: '4px 8px', borderRadius: '4px', fontSize: '11px', fontWeight: 'bold' }}>❌ CANCELLED</span>;
+    }
+    return <span style={{ background: 'rgba(59, 130, 246, 0.2)', color: '#3b82f6', padding: '4px 8px', borderRadius: '4px', fontSize: '11px', fontWeight: 'bold' }}>⏳ PENDING</span>;
+  };
+
   return (
     <div style={{ padding: '24px', color: '#f1f5f9', fontFamily: '"Sora", sans-serif' }}>
-      <h2 style={{ marginBottom: '24px' }}>📉 My Pending Orders</h2>
+      <h2 style={{ marginBottom: '24px' }}>📉 My Order Book</h2>
 
       <form onSubmit={placeOrder} style={{ marginBottom: '40px', background: '#0a1120', padding: '24px', borderRadius: '12px', border: '1px solid rgba(148, 163, 184, 0.1)' }}>
         <h3 style={{ marginTop: 0, marginBottom: '8px' }}>Place a New Limit Order</h3>
@@ -152,7 +163,7 @@ export default function OrderBook({ user }) {
         )}
       </form>
 
-      <h3 style={{ marginBottom: '16px' }}>My Waiting Orders</h3>
+      <h3 style={{ marginBottom: '16px' }}>My Order History</h3>
       <table style={{ width: '100%', textAlign: 'left', borderCollapse: 'collapse', background: '#0a1120', borderRadius: '12px', overflow: 'hidden' }}>
         <thead style={{ background: 'rgba(148, 163, 184, 0.05)' }}>
           <tr>
@@ -160,20 +171,22 @@ export default function OrderBook({ user }) {
             <th style={{ padding: '16px', color: '#94a3b8', fontSize: '12px', textTransform: 'uppercase' }}>Stock</th>
             <th style={{ padding: '16px', color: '#94a3b8', fontSize: '12px', textTransform: 'uppercase' }}>Quantity</th>
             <th style={{ padding: '16px', color: '#94a3b8', fontSize: '12px', textTransform: 'uppercase' }}>Limit Price</th>
+            <th style={{ padding: '16px', color: '#94a3b8', fontSize: '12px', textTransform: 'uppercase' }}>Status</th>
           </tr>
         </thead>
         <tbody>
-          {pendingOrders.map(order => (
+          {ordersHistory.map(order => (
             <tr key={order.id} style={{ borderBottom: '1px solid rgba(148, 163, 184, 0.05)' }}>
               <td style={{ padding: '16px', fontWeight: 'bold', color: order.order_type === 'BUY' ? '#34d399' : '#f87171' }}>{order.order_type}</td>
               <td style={{ padding: '16px' }}>{order.stock_symbol}</td>
               <td style={{ padding: '16px' }}>{order.quantity} shares</td>
               <td style={{ padding: '16px', fontFamily: '"IBM Plex Mono", monospace' }}>${(order.price_cents / 100).toFixed(2)}</td>
+              <td style={{ padding: '16px' }}>{getStatusBadge(order.status)}</td>
             </tr>
           ))}
-          {pendingOrders.length === 0 && (
+          {ordersHistory.length === 0 && (
             <tr>
-              <td colSpan="4" style={{ padding: '32px', textAlign: 'center', color: '#64748b', fontStyle: 'italic' }}>No pending orders right now.</td>
+              <td colSpan="5" style={{ padding: '32px', textAlign: 'center', color: '#64748b', fontStyle: 'italic' }}>No order history yet.</td>
             </tr>
           )}
         </tbody>
