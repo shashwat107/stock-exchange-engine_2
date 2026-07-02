@@ -1,15 +1,16 @@
 import React, { useState, useEffect, useCallback } from 'react';
 
-// 1. Accept the real logged-in user as a prop
+// Accept the real logged-in user as a prop
 export default function OrderBook({ user }) {
   const [pendingOrders, setPendingOrders] = useState([]);
+  const [holdings, setHoldings] = useState([]); // Track user's owned stocks
   const [stockSymbol, setStockSymbol] = useState('MOCK');
   const [orderType, setOrderType] = useState('BUY');
   const [quantity, setQuantity] = useState(1);
   const [price, setPrice] = useState(100);
   const [statusMessage, setStatusMessage] = useState("");
 
-  // 2. Pass the real user's email to the backend to get ONLY their orders
+  // 1. Fetch pending orders
   const fetchOrders = useCallback(async () => {
     if (!user?.email) return;
     try {
@@ -23,20 +24,52 @@ export default function OrderBook({ user }) {
     }
   }, [user?.email]);
 
+  // 2. Fetch user's current holdings to validate short selling
+  const fetchHoldings = useCallback(async () => {
+    if (!user?.email) return;
+    try {
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/portfolioSummary?email=${encodeURIComponent(user.email)}`);
+      const data = await res.json();
+      if (data && data.holdings) {
+        setHoldings(data.holdings);
+      }
+    } catch (err) {
+      console.error("Error fetching holdings for validation:", err);
+    }
+  }, [user?.email]);
+
+  // Sync data every 3 seconds
   useEffect(() => {
     fetchOrders();
-    const interval = setInterval(fetchOrders, 3000);
+    fetchHoldings();
+    const interval = setInterval(() => {
+      fetchOrders();
+      fetchHoldings();
+    }, 3000);
     return () => clearInterval(interval);
-  }, [fetchOrders]);
+  }, [fetchOrders, fetchHoldings]);
 
   async function placeOrder(e) {
     e.preventDefault();
+    const targetQuantity = parseInt(quantity);
+
+    // 3. Validation Guard: Check if user owns enough shares to SELL
+    if (orderType === 'SELL') {
+      const existingHolding = holdings.find(h => h.stock_symbol === stockSymbol);
+      const sharesOwned = existingHolding ? existingHolding.quantity : 0;
+
+      if (sharesOwned < targetQuantity) {
+        setStatusMessage(`❌ Insufficient shares. You only own ${sharesOwned} shares of ${stockSymbol}.`);
+        setTimeout(() => setStatusMessage(""), 4000);
+        return; // Halt form submission completely
+      }
+    }
 
     const newOrder = {
-      user_email: user.email, // 3. Securely use the authenticated email
+      user_email: user.email,
       stock_symbol: stockSymbol,
       order_type: orderType,
-      quantity: parseInt(quantity),
+      quantity: targetQuantity,
       price_cents: Math.round(parseFloat(price) * 100) 
     };
 
@@ -50,8 +83,10 @@ export default function OrderBook({ user }) {
       if (res.ok) {
         setStatusMessage("✅ Order placed successfully!");
         fetchOrders(); 
+        fetchHoldings(); // Refresh holdings after a change
       } else {
-        setStatusMessage("❌ Failed to place order.");
+        const errorData = await res.json().catch(() => ({}));
+        setStatusMessage(`❌ ${errorData.error || "Failed to place order."}`);
       }
 
       setTimeout(() => setStatusMessage(""), 3000);
@@ -63,16 +98,21 @@ export default function OrderBook({ user }) {
     }
   }
 
+  // Quick helper to show user how many shares they own right in the form
+  const currentStockHolding = holdings.find(h => h.stock_symbol === stockSymbol);
+  const sharesAvailable = currentStockHolding ? currentStockHolding.quantity : 0;
+
   return (
     <div style={{ padding: '24px', color: '#f1f5f9', fontFamily: '"Sora", sans-serif' }}>
       <h2 style={{ marginBottom: '24px' }}>📉 My Pending Orders</h2>
 
       <form onSubmit={placeOrder} style={{ marginBottom: '40px', background: '#0a1120', padding: '24px', borderRadius: '12px', border: '1px solid rgba(148, 163, 184, 0.1)' }}>
-        <h3 style={{ marginTop: 0, marginBottom: '20px' }}>Place a New Limit Order</h3>
+        <h3 style={{ marginTop: 0, marginBottom: '8px' }}>Place a New Limit Order</h3>
+        <p style={{ margin: '0 0 20px 0', fontSize: '13px', color: '#64748b' }}>
+          Currently owning: <strong style={{ color: '#3b82f6' }}>{sharesAvailable}</strong> shares of {stockSymbol}
+        </p>
 
         <div style={{ display: 'flex', gap: '20px', marginBottom: '20px' }}>
-          {/* Notice the manual email input field has been completely deleted! */}
-          
           <div>
             <label style={{ display: 'block', marginBottom: '8px', color: '#94a3b8' }}>Stock:</label>
             <select value={stockSymbol} onChange={(e) => setStockSymbol(e.target.value)} style={{ padding: '8px', background: '#1e293b', color: 'white', border: '1px solid #334155', borderRadius: '4px' }}>
