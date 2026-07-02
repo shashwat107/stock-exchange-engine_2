@@ -3,7 +3,7 @@ import './Symboltabs.css';
 
 // ... paste Symboltabs component code here ...
 import { SYMBOLS, SYMBOL_META, hexToRgb } from "../Constants";
-import "./SymbolTabs.css";
+import "./Symboltabs.css";
 
 export default function SymbolTabs({ activeSymbol, onSelect }) {
   return (
