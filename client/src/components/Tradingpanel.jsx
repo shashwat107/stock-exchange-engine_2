@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import './Tradingpanel.css';
 import { SYMBOL_META, formatPrice, hexToRgb } from "../constants";
 
@@ -36,7 +37,6 @@ function BalancesSection({ portfolio, activeSymbol }) {
           <div className="skeleton-line skeleton-line--right" />
         ) : (
           <div className="balance-value">
-            {/* FIXED: Looking for real quantity instead of mock_quantity */}
             {portfolio.quantity ?? 0}
             <span className="balance-unit">
               {(portfolio.quantity ?? 0) === 1 ? "share" : "shares"}
@@ -97,27 +97,21 @@ export default function TradingPanel({
   currentPrice,
   portfolio,
   activeSymbol,
-  onFetchPortfolio,
 }) {
-  const [loadingAction, setLoadingAction] = useState(null);
   const [tradeStatus, setTradeStatus] = useState(null);
+  const queryClient = useQueryClient(); // Grab the caching engine
 
   useEffect(() => {
     setTradeStatus(null);
   }, [activeSymbol]);
 
-  // FIXED: Looking for real quantity instead of mock_quantity
   const canSell = portfolio !== null && (portfolio.quantity ?? 0) >= 1;
   const noPrice = !currentPrice;
-  const anyLoading = loadingAction !== null;
   const { accent } = SYMBOL_META[activeSymbol];
 
-  const handleTrade = async (actionType) => {
-    if (anyLoading || noPrice) return;
-    setLoadingAction(actionType);
-    setTradeStatus(null);
-
-    try {
+  // ─── OPTIMISTIC MUTATION ENGINE ────────────────────────────────────────────
+  const tradeMutation = useMutation({
+    mutationFn: async (actionType) => {
       const response = await fetch("/api/trade", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -129,34 +123,77 @@ export default function TradingPanel({
         }),
       });
       const data = await response.json();
-      if (!response.ok)
-        throw new Error(data.error || data.message || `Server error: ${response.status}`);
+      if (!response.ok) throw new Error(data.error || "Trade failed");
+      return { data, actionType };
+    },
+    
+    // 1. ON CLICK: Fake the numbers instantly
+    onMutate: async (actionType) => {
+      setTradeStatus(null);
 
+      // Cancel background fetches so they don't ruin our optimistic update
+      await queryClient.cancelQueries({ queryKey: ['portfolio', user.email, activeSymbol] });
+
+      // Take a snapshot of the real numbers so we can roll back if needed
+      const previousPortfolio = queryClient.getQueryData(['portfolio', user.email, activeSymbol]);
+
+      // Forcibly update the UI cache right now
+      if (previousPortfolio) {
+        queryClient.setQueryData(['portfolio', user.email, activeSymbol], (old) => {
+          if (!old) return old;
+          const isBuy = actionType === 'BUY';
+          return {
+            ...old,
+            wallet_balance_cents: isBuy 
+              ? old.wallet_balance_cents - currentPrice.priceInCents
+              : old.wallet_balance_cents + currentPrice.priceInCents,
+            quantity: isBuy ? (old.quantity ?? 0) + 1 : (old.quantity ?? 0) - 1,
+          };
+        });
+      }
+
+      return { previousPortfolio }; // Pass the snapshot to the next steps
+    },
+
+    // 2. ON ERROR: Roll back to reality
+    onError: (err, actionType, context) => {
+      if (context?.previousPortfolio) {
+        queryClient.setQueryData(['portfolio', user.email, activeSymbol], context.previousPortfolio);
+      }
+      setTradeStatus({
+        type: "error",
+        message: err.message || "Trade failed. Numbers rolled back.",
+      });
+    },
+
+    // 3. ON SUCCESS: Print the receipt
+    onSuccess: ({ actionType }) => {
       const verb = actionType === "BUY" ? "Bought" : "Sold";
       setTradeStatus({
         type: "success",
         message: `${verb} 1 share of ${activeSymbol} at ${formatPrice(currentPrice.priceInCents)}`,
       });
-      if (onFetchPortfolio) await onFetchPortfolio();
-    } catch (err) {
-      setTradeStatus({
-        type: "error",
-        message: err.message || "Trade failed. Please try again.",
-      });
-    } finally {
-      setLoadingAction(null);
+    },
+
+    // 4. ON FINISH: Always ask the database for the definitive truth just to be safe
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ['portfolio', user.email, activeSymbol] });
     }
+  });
+
+  const handleTrade = (actionType) => {
+    if (tradeMutation.isPending || noPrice) return;
+    tradeMutation.mutate(actionType);
   };
+
+  const anyLoading = tradeMutation.isPending;
 
   return (
     <div className="panel">
       {/* Panel Header */}
       <div className="panel__header">
         <div className="panel__title">
-          <span
-            className="panel__dot"
-            style={{ background: accent, boxShadow: `0 0 6px ${accent}` }}
-          />
+          <span className="panel__dot" style={{ background: accent, boxShadow: `0 0 6px ${accent}` }} />
           Trading Panel
         </div>
         <div
@@ -196,12 +233,8 @@ export default function TradingPanel({
           colorActive="#15803d"
           colorHover="#16a34a"
           shadowColor="rgba(21,128,61,0.3)"
-          isLoading={loadingAction === "BUY"}
-          isDisabled={
-            anyLoading ||
-            noPrice ||
-            (portfolio?.wallet_balance_cents < currentPrice?.priceInCents)
-          }
+          isLoading={tradeMutation.isPending && tradeMutation.variables === "BUY"}
+          isDisabled={anyLoading || noPrice || (portfolio?.wallet_balance_cents < currentPrice?.priceInCents)}
           onClick={() => handleTrade("BUY")}
         />
         <TradeButton
@@ -210,7 +243,7 @@ export default function TradingPanel({
           colorActive="#b91c1c"
           colorHover="#dc2626"
           shadowColor="rgba(185,28,28,0.3)"
-          isLoading={loadingAction === "SELL"}
+          isLoading={tradeMutation.isPending && tradeMutation.variables === "SELL"}
           isDisabled={anyLoading || noPrice || !canSell}
           onClick={() => handleTrade("SELL")}
         />

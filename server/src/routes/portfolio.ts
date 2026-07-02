@@ -34,7 +34,7 @@ portfolio.get('/portfolio', async (c) => {
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-// POST /api/trade
+// POST /api/trade (Now powered by Database Transactions!)
 // ─────────────────────────────────────────────────────────────────────────────
 portfolio.post('/trade', async (c) => {
   const body = await c.req.json();
@@ -44,72 +44,30 @@ portfolio.post('/trade', async (c) => {
     return c.json({ error: 'Missing required fields: email, symbol, priceInCents, action' }, 400);
   }
 
-  const { data: portfolioRow } = await supabase
-    .from('portfolios')
-    .select('wallet_balance_cents')
-    .eq('user_email', email)
-    .single();
+  // 1. Trigger the bulletproof SQL transaction we just created
+  const { data, error } = await supabase.rpc('execute_trade_securely', {
+    p_user_email: email,
+    p_stock_symbol: symbol,
+    p_price_in_cents: priceInCents,
+    p_action: action
+  });
 
-  if (!portfolioRow) {
-    return c.json({ error: 'Portfolio not found for the provided email.' }, 404);
+  if (error) {
+    console.error("Database transaction error:", error);
+    return c.json({ error: 'Internal server error during trade.' }, 500);
   }
 
-  const { data: holding } = await supabase
-    .from('holdings')
-    .select('quantity')
-    .eq('user_email', email)
-    .eq('stock_symbol', symbol)
-    .maybeSingle();
-
-  const currentQty    = holding?.quantity ?? 0;
-  const currentWallet = portfolioRow.wallet_balance_cents;
-
-  // ── BUY ───────────────────────────────────────────────────────────────────
-  if (action === 'BUY') {
-    if (currentWallet < priceInCents) {
-      return c.json({ error: 'Insufficient funds.' }, 400);
-    }
-
-    const newBalance = currentWallet - priceInCents;
-
-    // 1. Take the money
-    await supabase.from('portfolios').update({ wallet_balance_cents: newBalance }).eq('user_email', email);
-
-    // 2. Add the stock (Safely, without looking for invested_cents)
-    if (holding) {
-      await supabase.from('holdings')
-        .update({ quantity: currentQty + 1 })
-        .eq('user_email', email)
-        .eq('stock_symbol', symbol);
-    } else {
-      await supabase.from('holdings')
-        .insert([{ user_email: email, stock_symbol: symbol, quantity: 1 }]);
-    }
-
-    return c.json({ message: 'Trade executed.', newWalletBalanceCents: newBalance, quantity: currentQty + 1 });
+  // 2. If the SQL function rejected the trade (e.g., insufficient funds)
+  if (!data.success) {
+    return c.json({ error: data.error }, 400);
   }
 
-  // ── SELL ──────────────────────────────────────────────────────────────────
-  if (action === 'SELL') {
-    if (currentQty < 1) {
-      return c.json({ error: 'No shares to sell.' }, 400);
-    }
-
-    const newBalance = currentWallet + priceInCents;
-
-    // 1. Give the money
-    await supabase.from('portfolios').update({ wallet_balance_cents: newBalance }).eq('user_email', email);
-
-    // 2. Remove the stock
-    await supabase.from('holdings')
-      .update({ quantity: currentQty - 1 })
-      .eq('user_email', email)
-      .eq('stock_symbol', symbol);
-
-    return c.json({ message: 'Trade executed.', newWalletBalanceCents: newBalance, quantity: currentQty - 1 });
-  }
-
-  return c.json({ error: `Unknown action "${action}". Use BUY or SELL.` }, 400);
+  // 3. If successful, pass the exact new numbers back to the frontend receipt
+  return c.json({ 
+    message: 'Trade executed.', 
+    newWalletBalanceCents: data.new_wallet_balance, 
+    quantity: data.new_quantity 
+  });
 });
 
 export default portfolio;
