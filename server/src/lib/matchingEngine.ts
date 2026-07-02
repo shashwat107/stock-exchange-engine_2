@@ -1,9 +1,23 @@
 import { supabase } from './supabase.js';
 
+// 🔥 THE MUTEX LOCK: This is the secret to a real exchange. 
+// It remembers which stocks are currently being calculated so they don't duplicate.
+const activeProcessing = new Set<string>();
+
 export async function processOrderBook(stockSymbol: string) {
-  console.log(`⚙️ [MATCHING ENGINE] Checking board for ${stockSymbol}...`);
+  // 1. CONCURRENCY GUARD: If the engine is already crunching this stock, stop and wait!
+  if (activeProcessing.has(stockSymbol)) {
+    console.log(`⏳ Engine already processing ${stockSymbol}, skipping concurrent run.`);
+    return; 
+  }
+  
+  // Lock the stock!
+  activeProcessing.add(stockSymbol); 
+
   try {
-    // 1. Get highest BUY orders (Max-Heap equivalent)
+    console.log(`⚙️ [MATCHING ENGINE] Checking board for ${stockSymbol}...`);
+    
+    // 1. Get highest BUY orders
     const { data: buys } = await supabase
       .from('orders')
       .select('*')
@@ -13,7 +27,7 @@ export async function processOrderBook(stockSymbol: string) {
       .order('price_cents', { ascending: false })
       .order('created_at', { ascending: true });
 
-    // 2. Get lowest SELL orders (Min-Heap equivalent)
+    // 2. Get lowest SELL orders
     const { data: sells } = await supabase
       .from('orders')
       .select('*')
@@ -33,15 +47,24 @@ export async function processOrderBook(stockSymbol: string) {
       let currentBuy = buys[buyIdx];
       let currentSell = sells[sellIdx];
 
-      // If the highest buyer isn't willing to pay what the lowest seller wants, the market stops crossing.
+      // If the highest buyer isn't willing to pay what the lowest seller wants, stop.
       if (currentBuy.price_cents < currentSell.price_cents) {
         break; 
       }
 
-      // 🔥 WE HAVE A MATCH! 
-      // Calculate how many shares they can actually trade
+      // 🔥 2. WASH TRADING GUARD: Prevent users from buying from themselves!
+      if (currentBuy.user_email === currentSell.user_email) {
+        console.warn(`🚨 Wash trade prevented for ${currentBuy.user_email}. Auto-cancelling duplicate order.`);
+        
+        // Cancel the newer order so it doesn't freeze the orderbook forever
+        await supabase.from('orders').update({ status: 'CANCELLED' }).eq('id', currentSell.id);
+        sellIdx++;
+        continue; // Skip to the next match
+      }
+
+      // Calculate the trade
       const tradeQuantity = Math.min(currentBuy.quantity, currentSell.quantity);
-      const executionPrice = currentSell.price_cents; // Buyer gets the seller's asking price
+      const executionPrice = currentSell.price_cents; 
       const totalCost = tradeQuantity * executionPrice;
 
       console.log(`🤝 MATCH! ${currentBuy.user_email} buys ${tradeQuantity} ${stockSymbol} from ${currentSell.user_email} at $${executionPrice/100}`);
@@ -89,5 +112,8 @@ export async function processOrderBook(stockSymbol: string) {
 
   } catch (err) {
     console.error("Matching Engine Error:", err);
+  } finally {
+    // 🔥 ALWAYS UNLOCK THE STOCK WHEN FINISHED OR IF IT CRASHES
+    activeProcessing.delete(stockSymbol);
   }
 }
