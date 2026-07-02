@@ -10,7 +10,7 @@ export default function Leaderboard() {
 
     async function fetchRankings() {
       try {
-        const res = await fetch('/api/leaderboard');
+        const res = await fetch(`${import.meta.env.VITE_API_URL}/api/leaderboard`);
         const data = await res.json();
         
         if (cancelled) return;
