@@ -25,7 +25,7 @@ export default function App() {
     queryFn: async () => {
       if (!user?.email) return null;
       const res = await fetch(
-        `/api/portfolio?email=${encodeURIComponent(user.email)}&symbol=${activeSymbol}`
+        `${import.meta.env.VITE_API_URL}/api/portfolio?email=${encodeURIComponent(user.email)}&symbol=${activeSymbol}`
       );
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Failed to load portfolio");
@@ -47,7 +47,7 @@ export default function App() {
 
     async function fetchTick() {
       try {
-        const res = await fetch("/api/tick");
+        const res = await fetch(`${import.meta.env.VITE_API_URL}/api/tick`);
         const data = await res.json();
         if (cancelled) return;
 

@@ -11,7 +11,7 @@ export default function MyPortfolio({ user }) {
 
     async function fetchPortfolio() {
       try {
-        const response = await fetch(`/api/portfolioSummary?email=${encodeURIComponent(user.email)}`);
+        const response = await fetch(`${import.meta.env.VITE_API_URL}/api/portfolioSummary?email=${encodeURIComponent(user.email)}`);
         const data = await response.json();
         setPortfolioData(data);
         setLoading(false);
@@ -28,7 +28,7 @@ export default function MyPortfolio({ user }) {
     let interval;
     async function fetchLivePrices() {
       try {
-        const res = await fetch("/api/tick");
+        const res = await fetch(`${import.meta.env.VITE_API_URL}/api/tick`);
         const data = await res.json();
         setLivePrices(data);
       } catch (err) {
