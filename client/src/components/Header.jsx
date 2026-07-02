@@ -2,8 +2,8 @@ import React from 'react';
 import './Header.css';
 
 // ... paste Header component code here ...
-import { SYMBOL_META } from "../constants";
-import { formatPrice } from "../constants";
+import { SYMBOL_META } from "../Constants";
+import { formatPrice } from "../Constants";
 import SymbolTabs from "./Symboltabs";
 import "./Header.css";
 
