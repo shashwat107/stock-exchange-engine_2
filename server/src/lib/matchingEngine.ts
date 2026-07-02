@@ -1,17 +1,14 @@
 import { supabase } from './supabase.js';
 
-// 🔥 THE MUTEX LOCK: This is the secret to a real exchange. 
-// It remembers which stocks are currently being calculated so they don't duplicate.
+// The Mutex Lock prevents concurrency bugs
 const activeProcessing = new Set<string>();
 
 export async function processOrderBook(stockSymbol: string) {
-  // 1. CONCURRENCY GUARD: If the engine is already crunching this stock, stop and wait!
   if (activeProcessing.has(stockSymbol)) {
     console.log(`⏳ Engine already processing ${stockSymbol}, skipping concurrent run.`);
     return; 
   }
   
-  // Lock the stock!
   activeProcessing.add(stockSymbol); 
 
   try {
@@ -47,19 +44,9 @@ export async function processOrderBook(stockSymbol: string) {
       let currentBuy = buys[buyIdx];
       let currentSell = sells[sellIdx];
 
-      // If the highest buyer isn't willing to pay what the lowest seller wants, stop.
+      // If prices don't overlap, stop.
       if (currentBuy.price_cents < currentSell.price_cents) {
         break; 
-      }
-
-      // 🔥 2. WASH TRADING GUARD: Prevent users from buying from themselves!
-      if (currentBuy.user_email === currentSell.user_email) {
-        console.warn(`🚨 Wash trade prevented for ${currentBuy.user_email}. Auto-cancelling duplicate order.`);
-        
-        // Cancel the newer order so it doesn't freeze the orderbook forever
-        await supabase.from('orders').update({ status: 'CANCELLED' }).eq('id', currentSell.id);
-        sellIdx++;
-        continue; // Skip to the next match
       }
 
       // Calculate the trade
@@ -113,7 +100,6 @@ export async function processOrderBook(stockSymbol: string) {
   } catch (err) {
     console.error("Matching Engine Error:", err);
   } finally {
-    // 🔥 ALWAYS UNLOCK THE STOCK WHEN FINISHED OR IF IT CRASHES
     activeProcessing.delete(stockSymbol);
   }
 }
