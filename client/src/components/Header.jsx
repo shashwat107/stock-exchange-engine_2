@@ -4,7 +4,7 @@ import './Header.css';
 // ... paste Header component code here ...
 import { SYMBOL_META } from "../constants";
 import { formatPrice } from "../constants";
-import SymbolTabs from "./SymbolTabs";
+import SymbolTabs from "./Symboltabs";
 import "./Header.css";
 
 export default function Header({ activeSymbol, currentPrice, priceChange, onSelectSymbol }) {
