@@ -13,7 +13,7 @@ export default function OrderBook({ user }) {
   const fetchOrders = useCallback(async () => {
     if (!user?.email) return;
     try {
-      const res = await fetch(`/api/orders/pending?email=${encodeURIComponent(user.email)}`);
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/orders/pending?email=${encodeURIComponent(user.email)}`);
       const data = await res.json();
       if (Array.isArray(data)) {
         setPendingOrders(data);
@@ -41,7 +41,7 @@ export default function OrderBook({ user }) {
     };
 
     try {
-      const res = await fetch('/api/orders/place', {
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/orders/place`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(newOrder)

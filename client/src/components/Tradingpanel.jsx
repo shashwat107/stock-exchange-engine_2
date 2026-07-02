@@ -112,7 +112,7 @@ export default function TradingPanel({
   // ─── OPTIMISTIC MUTATION ENGINE ────────────────────────────────────────────
   const tradeMutation = useMutation({
     mutationFn: async (actionType) => {
-      const response = await fetch("/api/trade", {
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/trade`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
