@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import './Tradingpanel.css';
-import { SYMBOL_META, formatPrice, hexToRgb } from "../constants";
+import { SYMBOL_META, formatPrice, hexToRgb } from "../Constants";
 
 // ─── TradeStatusBanner ───────────────────────────────────────────────────────
 function TradeStatusBanner({ status }) {
